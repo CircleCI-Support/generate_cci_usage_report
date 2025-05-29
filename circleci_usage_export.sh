@@ -3,9 +3,9 @@
 usage() {
   echo "Usage: $0 [options]"
   echo "Options:"
-  echo "  --org_id \"ORG_ID\"    Organization ID(s) (comma-separated)"
+  echo "  --org_id \"ORG_ID\"    Organization ID(s) (comma-separated, required unless ORG_ID env var is set)"
   echo "                      Example: --org_id \"org_id_1,org_id_2\" or --org_id \"org_id_1, org_id_2\""
-  echo "  --token TOKEN        CircleCI API Token (not required if CIRCLE_TOKEN is set locally)"
+  echo "  --token TOKEN        CircleCI API Token (required unless CIRCLE_TOKEN env var is set)"
   echo "  --start START_DATE   Start date in YYYY-MM-DD format or with time (required unless START_DATE env var is set)"
   echo "  --end END_DATE       End date in YYYY-MM-DD format or with time (required unless END_DATE env var is set)"
   echo "  --output DIR         Output directory (default: current directory)"
@@ -136,7 +136,7 @@ END_DATE_FORMATTED=$(format_date "$END_DATE" "end")
 echo "Using organization ID(s): $ORG_ID"
 echo "Date range: $START_DATE_FORMATTED to $END_DATE_FORMATTED"
 
-# Convert comma-separated org IDs into JSON array format
+# Convert comma-separated org IDs into JSON array format (handling optional spaces)
 # Remove all spaces, then trim
 ORG_ID_CLEANED=$(echo "$ORG_ID" | tr -d ' ' | sed 's/^\s*//;s/\s*$//')
 IFS=',' read -ra ORG_IDS <<< "$ORG_ID_CLEANED"
@@ -243,8 +243,8 @@ if [[ "$job_state" == "completed" ]]; then
   for url in $download_urls; do
     echo "Downloading $url..."
     
-    # File name for the compressed file
-    gz_file="${OUTPUT_DIR}/usage_report_$(basename "$url")"
+    # Generate a file name that includes date
+    gz_file="${OUTPUT_DIR}/usage_report_${start_date_filename}_to_${end_date_filename}.csv.gz"
     
     # Download the file
     curl -L -o "$gz_file" "$url"
