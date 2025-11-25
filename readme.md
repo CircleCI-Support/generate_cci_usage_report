@@ -80,20 +80,21 @@ Supported date formats:
 
 ## Output
 
-The script generates CSV files in the specified output directory with the naming format:
+The script generates CSV files in the specified output directory:
 
-```text
-usage_report_START-DATE_to_END-DATE_ORG-ID.csv
-```
+### Multiple Files from API
 
-## Debug Mode
+When the CircleCI API returns multiple files (common for large date ranges or multi-org queries), the script will:
 
-For detailed API responses, use the debug flag:
+1. **Preserve individual files**: Each downloaded file is saved separately as `usage_report_START-DATE_to_END-DATE_ORG-ID_part#.csv`
+2. **Create a combined file**: All files are merged into `usage_report_START-DATE_to_END-DATE_ORG-ID_combined.csv`
 
-```bash
-./circleci_usage_export.sh --debug [other options]
-```
+This approach allows you to:
+- Use the combined file for comprehensive analysis
+- Verify individual parts if you notice any discrepancies
+- Troubleshoot issues by examining each downloaded segment
 
-[token-link]: https://app.circleci.com/settings/user/tokens
-[org-settings]: https://circleci.com/docs/introduction-to-the-circleci-web-app/#organization-settings
-[api-docs]: https://circleci.com/docs/managing-api-tokens/#creating-a-personal-api-token
+### File Naming Format
+
+- Individual files: `usage_report_START-DATE_to_END-DATE_ORG-ID_part1.csv`
+- Combined file: `usage_report_START-DATE_to_END-DATE_ORG-ID_combined.csv`
