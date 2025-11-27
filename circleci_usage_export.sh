@@ -15,7 +15,7 @@ usage() {
 }
 
 # Default values
-OUTPUT_DIR=
+OUTPUT_DIR="."
 ORG_ID=
 CIRCLE_TOKEN=
 DEBUG=false
