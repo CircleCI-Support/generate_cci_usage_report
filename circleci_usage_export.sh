@@ -16,6 +16,8 @@ usage() {
 
 # Default values
 OUTPUT_DIR="."
+ORG_ID=
+CIRCLE_TOKEN=
 DEBUG=false
 
 # Parse command line arguments
@@ -232,38 +234,90 @@ if [[ "$job_state" == "completed" ]]; then
   # Extract download URLs
   download_urls=$(echo "$job_status" | jq -r '.download_urls[]')
   
-  # Generate a timestamp for the filename
-  timestamp=$(date +"%Y%m%d_%H%M%S")
+  # Count the number of URLs
+  url_count=$(echo "$download_urls" | wc -l)
+  echo "Found $url_count file(s) to download"
   
   # Format dates for filename
   start_date_filename=$(echo "$START_DATE" | tr ':' '-' | tr 'T' '_')
   end_date_filename=$(echo "$END_DATE" | tr ':' '-' | tr 'T' '_')
   
-  # Download each file
+  # Track all downloaded files for combining
+  downloaded_files=()
+  file_counter=1
+  
+  # Download each file individually
   for url in $download_urls; do
-    echo "Downloading $url..."
+    echo "Downloading file $file_counter of $url_count: $url..."
     
-    # Generate a file name that includes date
-    gz_file="${OUTPUT_DIR}/usage_report_${start_date_filename}_to_${end_date_filename}.csv.gz"
+    # Generate unique filenames for each part
+    gz_file="${OUTPUT_DIR}/usage_report_${start_date_filename}_to_${end_date_filename}_part${file_counter}.csv.gz"
+    output_file="${OUTPUT_DIR}/usage_report_${start_date_filename}_to_${end_date_filename}_${ORG_ID}_part${file_counter}.csv"
     
     # Download the file
     curl -L -o "$gz_file" "$url"
     
     if [ $? -eq 0 ]; then
-      # Unzip the downloaded .csv.gz file and create final filename
-      output_file="${OUTPUT_DIR}/usage_report_${start_date_filename}_to_${end_date_filename}_${ORG_ID}.csv"
+      # Unzip the downloaded .csv.gz file
       echo "Unzipping to $output_file..."
       gunzip -c "$gz_file" > "$output_file"
       echo "Successfully created $output_file"
       
-      # Remove the compressed file unless user requests to keep it
+      # Add to our list of files to combine
+      downloaded_files+=("$output_file")
+      
+      # Remove the compressed file
       rm "$gz_file"
+      
+      file_counter=$((file_counter + 1))
     else
       echo "Failed to download $url"
     fi
   done
   
+  # Combine all downloaded files into a single file
+  if [ ${#downloaded_files[@]} -gt 0 ]; then
+    combined_file="${OUTPUT_DIR}/usage_report_${start_date_filename}_to_${end_date_filename}_${ORG_ID}_combined.csv"
+    
+    if [ ${#downloaded_files[@]} -eq 1 ]; then
+      # Only one file - just copy it as the combined file
+      echo "Only one file downloaded. Creating combined file as a copy..."
+      cp "${downloaded_files[0]}" "$combined_file"
+      echo "Successfully created combined file: $combined_file"
+    else
+      # Multiple files - combine them
+      echo "Combining ${#downloaded_files[@]} files into $combined_file..."
+      
+      # Copy first file with header
+      cat "${downloaded_files[0]}" > "$combined_file"
+      
+      # Append remaining files without headers (skip first line)
+      for ((i=1; i<${#downloaded_files[@]}; i++)); do
+        echo "  Appending ${downloaded_files[i]}..."
+        tail -n +2 "${downloaded_files[i]}" >> "$combined_file"
+      done
+      
+      echo "Successfully created combined file: $combined_file"
+      
+      # Show file sizes for verification
+      echo ""
+      echo "File summary:"
+      for file in "${downloaded_files[@]}"; do
+        line_count=$(wc -l < "$file")
+        echo "  $(basename "$file"): $line_count lines"
+      done
+      combined_line_count=$(wc -l < "$combined_file")
+      echo "  $(basename "$combined_file"): $combined_line_count lines (combined)"
+    fi
+  else
+    echo "No files were successfully downloaded."
+    exit 1
+  fi
+  
+  echo ""
   echo "All files downloaded and processed."
+  echo "Individual files preserved for verification."
+  echo "Combined file ready for analysis: $combined_file"
 else
   echo "Job has finished with state: $job_state"
   if [[ "$job_state" == "processing" ]]; then
